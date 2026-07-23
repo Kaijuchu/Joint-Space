@@ -56,6 +56,13 @@ window.JOINT_CONFIG = {
   };
 
   // Auth helpers used by the component.
+  var __authListeners = [];
+  var __lastUser = null;
+  function __setUser(u){ __lastUser = u; for (var i=0;i<__authListeners.length;i++){ try { __authListeners[i](u); } catch (e) {} } }
+  if (sb) {
+    sb.auth.getSession().then(function(r){ var u = (r.data && r.data.session) ? r.data.session.user : null; if (u) __setUser(u); }).catch(function(){});
+    sb.auth.onAuthStateChange(function(_e, session){ __setUser(session ? session.user : null); });
+  }
   window.jointAuth = {
     configured: hasSb,
     emailAuth: function(mode, email, password, name){
@@ -76,10 +83,11 @@ window.JOINT_CONFIG = {
     },
     signOut: function(){ return sb ? sb.auth.signOut() : Promise.resolve(); },
     currentUser: function(){
+      if (__lastUser) return Promise.resolve(__lastUser);
       if (!sb) return Promise.resolve(null);
       return sb.auth.getSession().then(function(r){ return (r.data && r.data.session) ? r.data.session.user : null; });
     },
-    onChange: function(cb){ if (sb) sb.auth.onAuthStateChange(function(_e, session){ cb(session ? session.user : null); }); }
+    onChange: function(cb){ __authListeners.push(cb); if (__lastUser) { try { cb(__lastUser); } catch (e) {} } }
   };
 })();
 </script>

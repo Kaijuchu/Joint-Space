@@ -135,3 +135,21 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 -- Done. Tables: profiles, connections, direct_messages (all RLS-protected).
+
+-- =====================================================================
+--  5) CONNECTION LABELS : per-user, per-space category for each contact
+--     (so the same person can be a Work "Colleague" AND a Casual "Friend")
+-- =====================================================================
+create table if not exists public.connection_meta (
+  owner      uuid not null references auth.users(id) on delete cascade,
+  other      uuid not null references auth.users(id) on delete cascade,
+  space      text not null check (space in ('work','casual')),
+  label      text,          -- work: Colleague/Manager/Report/Teammate · casual: Friend/Family/Partner
+  team       text,          -- work only: team name (yours or another)
+  created_at timestamptz default now(),
+  primary key (owner, other, space)
+);
+alter table public.connection_meta enable row level security;
+drop policy if exists cmeta_all on public.connection_meta;
+create policy cmeta_all on public.connection_meta
+  for all to authenticated using (owner = auth.uid()) with check (owner = auth.uid());

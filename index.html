@@ -99,6 +99,7 @@ window.JOINT_CONFIG = {
   }
   window.jointDB = {
     ready: function(){ return !!sb; },
+    myId: function(){ return __myId(); },
     myProfile: function(){
       var id = __myId(); if (!sb || !id) return Promise.resolve(null);
       return sb.from('profiles').select('id,username,display_name,color').eq('id', id).maybeSingle().then(function(r){
@@ -120,19 +121,29 @@ window.JOINT_CONFIG = {
       if (!handle) return Promise.resolve(null);
       return sb.from('profiles').select('id,username,display_name,color').ilike('username', handle).neq('id', __myId()||__NIL).maybeSingle().then(function(r){ return r.data || null; });
     },
-    sendRequest: function(targetId){
+    sendRequest: function(targetId, meta){
       var me = __myId(); if (!sb || !me) return Promise.resolve({ ok:false, error:'Not signed in' });
       if (targetId === me) return Promise.resolve({ ok:false, error:"That's you" });
+      var self = this;
+      function withMeta(result){ return (meta && meta.space) ? self.setMeta(targetId, meta.space, meta.label, meta.team).then(function(){ return result; }) : result; }
       return sb.from('connections').select('*').or('and(requester.eq.'+me+',addressee.eq.'+targetId+'),and(requester.eq.'+targetId+',addressee.eq.'+me+')').then(function(r){
         var rows = r.data || [];
         if (rows.length){
           var ex = rows[0];
-          if (ex.status === 'accepted') return { ok:true, already:'connected' };
-          if (ex.addressee === me) return sb.from('connections').update({ status:'accepted' }).eq('id', ex.id).then(function(){ return { ok:true, accepted:true }; });
-          return { ok:true, already:'pending' };
+          if (ex.status === 'accepted') return withMeta({ ok:true, already:'connected' });
+          if (ex.addressee === me) return sb.from('connections').update({ status:'accepted' }).eq('id', ex.id).then(function(){ return withMeta({ ok:true, accepted:true }); });
+          return withMeta({ ok:true, already:'pending' });
         }
-        return sb.from('connections').insert({ requester: me, addressee: targetId }).then(function(ins){ return ins.error ? { ok:false, error:ins.error.message } : { ok:true, sent:true }; });
+        return sb.from('connections').insert({ requester: me, addressee: targetId }).then(function(ins){ return ins.error ? { ok:false, error:ins.error.message } : withMeta({ ok:true, sent:true }); });
       });
+    },
+    setMeta: function(otherId, space, label, team){
+      var me = __myId(); if (!sb || !me) return Promise.resolve({ ok:false });
+      return sb.from('connection_meta').upsert({ owner: me, other: otherId, space: space, label: label||null, team: team||null }, { onConflict: 'owner,other,space' }).then(function(r){ return { ok:!r.error, error:r.error&&r.error.message }; });
+    },
+    removeMeta: function(otherId, space){
+      var me = __myId(); if (!sb || !me) return Promise.resolve({ ok:false });
+      return sb.from('connection_meta').delete().eq('owner', me).eq('other', otherId).eq('space', space).then(function(r){ return { ok:!r.error }; });
     },
     respondRequest: function(connId, accept){
       if (!sb) return Promise.resolve({ ok:false });
@@ -147,7 +158,15 @@ window.JOINT_CONFIG = {
       var me = __myId(); if (!sb || !me) return Promise.resolve([]);
       return sb.from('connections').select('*').eq('status','accepted').or('requester.eq.'+me+',addressee.eq.'+me).then(function(r){
         var rows = r.data || []; var others = rows.map(function(c){ return c.requester===me ? c.addressee : c.requester; });
-        return __profByIds(others);
+        if (!others.length) return [];
+        return Promise.all([
+          __profByIds(others),
+          sb.from('connection_meta').select('*').eq('owner', me).then(function(m){ return m.data || []; })
+        ]).then(function(res){
+          var profs = res[0], metas = res[1], by = {};
+          metas.forEach(function(m){ (by[m.other] = by[m.other] || {})[m.space] = m; });
+          return profs.map(function(p){ var mm = by[p.id] || {}; return { user: p, work: mm.work || null, casual: mm.casual || null }; });
+        });
       });
     },
     listIncoming: function(){
@@ -201,6 +220,9 @@ class Component extends DCLogic {
     space: this.props.defaultSpace ?? 'work',
     view: 'chat', lang: 'en', theme: 'dark', langMenuOpen: false, spacePhase: 'in', sbCollapsed: false,
     modal: null, user: { signedIn: false, name: 'Jordan', email: 'jordan@jointspace.app', color: '#159d58', status: 'online', avatarImg: null },
+    friendsOpen: false, myUserId: '', myHandle: '', handleInput: '', handleMsg: '',
+    addQuery: '', addFound: null, addMsg: '', addLabel: '', addTeam: '',
+    incoming: [], connections: [], dmWith: null, dmMsgs: [], dmInput: '',
     authMode: 'signin', loginName: '', authError: '', authBusy: false, spacePicked: false, pickerLeaving: false, introPlaying: true, warping: false, rememberMe: true,
     loginEmail: '', loginPw: '', notifOn: true, soundOn: true, skipIntro: false, gemKey: '',
     isMobile: false, toast: '',
@@ -277,6 +299,40 @@ class Component extends DCLogic {
   componentDidUpdate(prevProps) {
     if (prevProps.lightBlobOpacity !== this.props.lightBlobOpacity || prevProps.lightBlobVibrance !== this.props.lightBlobVibrance) this.applyTheme();
   }
+  openFriends(){ this.setState({ friendsOpen: true, dmWith: null, addFound: null, addMsg: '', addQuery: '' }); this.reloadFriends(); }
+  reloadFriends(){
+    if (!(window.jointDB && window.jointDB.ready())){ this.setState({ handleMsg: 'Sign in to add people' }); return; }
+    window.jointDB.myProfile().then(p => this.setState({ myHandle: (p && p.username) || '', handleInput: (p && p.username) || this.state.handleInput, myUserId: (p && p.id) || this.state.myUserId }));
+    window.jointDB.listIncoming().then(list => this.setState({ incoming: list || [] }));
+    window.jointDB.listConnections().then(list => this.setState({ connections: list || [] }));
+  }
+  saveHandle(){
+    const h = (this.state.handleInput || '').trim();
+    window.jointDB.setUsername(h).then(r => { if (r.ok){ this.setState({ myHandle: r.username, handleMsg: 'Saved \u2713' }); this.toast('Your handle is @' + r.username); } else this.setState({ handleMsg: r.error || 'Could not save' }); });
+  }
+  searchAdd(){
+    const q = (this.state.addQuery || '').trim();
+    if (!q){ this.setState({ addFound: null, addMsg: '' }); return; }
+    window.jointDB.searchByHandle(q).then(u => this.setState({ addFound: u, addMsg: u ? '' : 'No user with that @handle' }));
+  }
+  doAdd(){
+    const u = this.state.addFound; if (!u) return;
+    const space = this.state.space === 'work' ? 'work' : 'casual';
+    const meta = { space, label: this.state.addLabel || '', team: this.state.space === 'work' ? (this.state.addTeam || '') : '' };
+    window.jointDB.sendRequest(u.id, meta).then(r => {
+      if (!r.ok){ this.setState({ addMsg: r.error || 'Could not send' }); return; }
+      this.toast(r.accepted ? 'Connected with @' + u.username : (r.already ? 'Already ' + (r.already === 'connected' ? 'connected' : 'requested') : 'Request sent to @' + u.username));
+      this.setState({ addQuery: '', addFound: null, addLabel: '', addTeam: '', addMsg: '' });
+      this.reloadFriends();
+    });
+  }
+  respondReq(connId, accept){ window.jointDB.respondRequest(connId, accept).then(() => { this.toast(accept ? 'Connection accepted \u2713' : 'Request declined'); this.reloadFriends(); }); }
+  openDM(user){ this.setState({ dmWith: user, dmMsgs: [], dmInput: '' }); window.jointDB.listDMs(user.id).then(msgs => this.setState({ dmMsgs: msgs || [] })); }
+  sendDMMsg(){
+    const u = this.state.dmWith, body = (this.state.dmInput || '').trim(); if (!u || !body) return;
+    window.jointDB.sendDM(u.id, body).then(r => { if (r.ok && r.msg){ this.setState(st => ({ dmMsgs: [...st.dmMsgs, r.msg], dmInput: '' })); } else if (r.ok){ this.setState({ dmInput: '' }); } else this.toast(r.error || 'Message failed'); });
+  }
+  copyInvite(){ window.jointDB.inviteLink().then(link => { if (!link){ this.toast('Set your @handle first'); return; } try { navigator.clipboard.writeText(link); this.toast('Invite link copied \u2713'); } catch(e){ this.toast(link); } }); }
   componentDidMount() {
     this.applyTheme();
     try { var _gk = localStorage.getItem('joint_gem_key') || ''; if (_gk) { window.JOINT_GEM_KEY = _gk; this.setState({ gemKey: _gk }); } } catch (_e) {}
@@ -284,6 +340,13 @@ class Component extends DCLogic {
       const applyUser = u => { if (!u) return; this.setState(st => st.user.signedIn ? {} : ({ user: { ...st.user, signedIn: true, email: u.email || st.user.email, name: (u.user_metadata && u.user_metadata.full_name) || (u.email ? u.email.split('@')[0] : st.user.name) }, modal: null, authError: '' })); };
       window.jointAuth.currentUser().then(applyUser).catch(() => {});
       window.jointAuth.onChange(applyUser);
+    }
+    if (window.jointDB && window.jointDB.ready()) {
+      const uid = window.jointDB.myId ? window.jointDB.myId() : null; if (uid) this.setState({ myUserId: uid });
+      window.jointDB.myProfile().then(p => { if (p && p.username) this.setState({ myHandle: p.username, handleInput: p.username }); if (p && p.id) this.setState({ myUserId: p.id }); });
+      window.jointDB.handleInvite().then(res => { if (res && res.user) this.toast((res.res && res.res.accepted ? 'Connected with @' : 'Request sent to @') + res.user.username); });
+      this._dmUnsub = window.jointDB.subscribeDMs(m => { const dw = this.state.dmWith; if (dw && (m.sender === dw.id || m.recipient === dw.id)) this.setState(st => st.dmMsgs.some(x => x.id === m.id) ? {} : ({ dmMsgs: [...st.dmMsgs, m] })); });
+      this._connUnsub = window.jointDB.subscribeConnections(() => { if (this.state.friendsOpen) this.reloadFriends(); });
     }
     if (this.state.skipIntro) this.setState({ introPlaying: false });
     else this._introTimer = setTimeout(() => this.setState({ introPlaying: false }), 2300);
@@ -615,6 +678,29 @@ class Component extends DCLogic {
       openAccount: () => this.setState({ modal: 'account' }),
       openSettings: () => this.setState({ modal: 'settings' }),
       closeModal: () => this.setState({ modal: null }),
+      friendsOpen: s.friendsOpen, openFriends: () => this.openFriends(), closeFriends: () => this.setState({ friendsOpen: false, dmWith: null }),
+      friendsSpaceWord: s.space === 'work' ? 'Work' : 'Casual',
+      hasHandle: !!s.myHandle, myHandleAt: s.myHandle ? ('@' + s.myHandle) : '',
+      handleInput: s.handleInput, onHandleInput: e => this.setState({ handleInput: e.target.value, handleMsg: '' }), handleMsg: s.handleMsg, saveHandle: () => this.saveHandle(),
+      addQuery: s.addQuery, onAddQuery: e => this.setState({ addQuery: e.target.value, addMsg: '' }), searchAdd: () => this.searchAdd(),
+      addFound: !!s.addFound,
+      addFoundName: s.addFound ? (s.addFound.display_name || ('@' + s.addFound.username)) : '',
+      addFoundHandle: s.addFound ? ('@' + s.addFound.username) : '',
+      addFoundInitials: s.addFound ? (s.addFound.display_name || s.addFound.username || '?').slice(0, 2).toUpperCase() : '',
+      addFoundColor: s.addFound ? (s.addFound.color || '#159d58') : '#159d58',
+      addMsg: s.addMsg, isWork: s.space === 'work', addTeam: s.addTeam, onAddTeam: e => this.setState({ addTeam: e.target.value }), doAdd: () => this.doAdd(),
+      labelOptions: (s.space === 'work' ? ['Colleague', 'Teammate', 'Manager', 'Report'] : ['Friend', 'Family', 'Partner']).map(l => ({ name: l, bg: s.addLabel === l ? accent : 'var(--c0,#0b0c10)', fg: s.addLabel === l ? 'var(--c0,#0b0c10)' : 'var(--t4,#aab0bd)', pick: () => this.setState({ addLabel: l }) })),
+      hasIncoming: s.incoming.length > 0,
+      incomingList: s.incoming.map(it => ({ name: it.user.display_name || ('@' + it.user.username) || 'Someone', handle: it.user.username ? ('@' + it.user.username) : '', initials: (it.user.display_name || it.user.username || '?').slice(0, 2).toUpperCase(), color: it.user.color || '#159d58', accept: () => this.respondReq(it.connId, true), decline: () => this.respondReq(it.connId, false) })),
+      hasConns: s.connections.length > 0,
+      spaceConns: s.connections.map(c => { const meta = s.space === 'work' ? c.work : c.casual; return { name: c.user.display_name || ('@' + c.user.username), handle: c.user.username ? ('@' + c.user.username) : '', initials: (c.user.display_name || c.user.username || '?').slice(0, 2).toUpperCase(), color: c.user.color || '#159d58', label: meta && meta.label ? meta.label : '', team: meta && meta.team ? (' · ' + meta.team) : '', hasLabel: !!(meta && meta.label), openDM: () => this.openDM(c.user) }; }),
+      copyInvite: () => this.copyInvite(),
+      dmOpen: !!s.dmWith, dmName: s.dmWith ? (s.dmWith.display_name || ('@' + s.dmWith.username)) : '', dmBack: () => this.setState({ dmWith: null }),
+      dmInput: s.dmInput, onDmInput: e => this.setState({ dmInput: e.target.value }), sendDMMsg: () => this.sendDMMsg(),
+      dmKey: e => { if (e.key === 'Enter') this.sendDMMsg(); },
+      dmMsgs: s.dmMsgs.map(m => ({ text: m.body, mine: m.sender === s.myUserId, align: m.sender === s.myUserId ? 'flex-end' : 'flex-start', bg: m.sender === s.myUserId ? accent : 'var(--c5,#181c24)', fg: m.sender === s.myUserId ? 'var(--c0,#0b0c10)' : 'var(--t0,#f2f3f5)' })),
+      noHandle: !s.myHandle, handleAndList: !!s.myHandle && !s.dmWith, handleAndDM: !!s.myHandle && !!s.dmWith, noConns: !s.connections.length,
+      addKey: e => { if (e.key === 'Enter') this.searchAdd(); },
       stopProp: e => e.stopPropagation(),
       modalTitle: s.modal === 'account' ? (s.user.signedIn ? 'Account' : 'Sign in') : 'Settings',
       signedIn: s.user.signedIn, notSignedIn: !s.user.signedIn,
@@ -1268,6 +1354,9 @@ input:focus,textarea:focus{box-shadow:0 0 0 1px rgba(47,191,119,.4);}
           <span style="display:block;font:600 10.5px 'Manrope';color:{{ userStatusColor }}">{{ userStatusLabel }}</span>
         </span>
       </button>
+      <button onClick="{{ openFriends }}" title="Friends" style="width:32px;height:32px;flex-shrink:0;border:none;border-radius:99px;background:none;color:var(--t6,#8b91a0);cursor:pointer;display:{{ sbHide }};place-items:center" style-hover="color:var(--t0,#f2f3f5);background:var(--c5,#181c24)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style="vertical-align:middle"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+      </button>
       <button onClick="{{ openSettings }}" title="Settings" style="width:32px;height:32px;flex-shrink:0;border:none;border-radius:99px;background:none;color:var(--t6,#8b91a0);cursor:pointer;display:{{ sbHide }};place-items:center" style-hover="color:var(--t0,#f2f3f5);background:var(--c5,#181c24)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style="vertical-align:middle"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
       </button>
@@ -1847,6 +1936,91 @@ input:focus,textarea:focus{box-shadow:0 0 0 1px rgba(47,191,119,.4);}
     </div>
   </div>
 
+  <sc-if value="{{ friendsOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeFriends }}" style="position:fixed;inset:0;z-index:86;background:rgba(4,10,7,.5);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .2s">
+    <div onClick="{{ stopProp }}" style="width:min(460px,96vw);max-height:88vh;display:flex;flex-direction:column;background:var(--c4,#141821);border:1px solid var(--c9,rgba(255,255,255,.13));border-radius:22px;backdrop-filter:blur(30px) saturate(1.6);box-shadow:0 40px 110px rgba(0,0,0,.55);overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--c7,#1c1f27)">
+        <div style="font:800 16px 'Space Grotesk';color:var(--t0,#f2f3f5);letter-spacing:-.3px">{{ friendsSpaceWord }} · People</div>
+        <button onClick="{{ closeFriends }}" style="width:28px;height:28px;border:none;border-radius:99px;background:var(--c5,#181c24);color:var(--t6,#8b91a0);font:600 15px 'Manrope';cursor:pointer">×</button>
+      </div>
+      <div style="padding:18px 20px;overflow:auto">
+        <sc-if value="{{ noHandle }}" hint-placeholder-val="{{ false }}">
+          <div style="font:700 10px 'JetBrains Mono';color:var(--t8,#5c6270);letter-spacing:1.2px;margin-bottom:8px">PICK YOUR @HANDLE</div>
+          <div style="font:500 12px/1.5 'Manrope';color:var(--t5,#9aa1af);margin-bottom:10px">Others use this to find and add you.</div>
+          <div style="display:flex;gap:8px">
+            <input value="{{ handleInput }}" onInput="{{ onHandleInput }}" placeholder="yourhandle" style="flex:1;background:var(--c0,#0b0c10);border:1px solid var(--c12,#262b36);border-radius:10px;padding:10px 12px;color:var(--t0,#f2f3f5);font:600 13px 'Manrope';outline:none">
+            <button onClick="{{ saveHandle }}" style="padding:10px 16px;border:none;border-radius:10px;background:{{ accent }};color:var(--c0,#0b0c10);font:800 12.5px 'Manrope';cursor:pointer">Save</button>
+          </div>
+          <div style="font:600 11px 'Manrope';color:var(--t6,#8b91a0);margin-top:7px">{{ handleMsg }}</div>
+        </sc-if>
+        <sc-if value="{{ handleAndList }}" hint-placeholder-val="{{ true }}">
+          <div style="font:700 10px 'JetBrains Mono';color:var(--t8,#5c6270);letter-spacing:1.2px;margin-bottom:8px">ADD SOMEONE</div>
+          <div style="display:flex;gap:8px">
+            <input value="{{ addQuery }}" onInput="{{ onAddQuery }}" onKeyDown="{{ addKey }}" placeholder="@handle" style="flex:1;background:var(--c0,#0b0c10);border:1px solid var(--c12,#262b36);border-radius:10px;padding:10px 12px;color:var(--t0,#f2f3f5);font:600 13px 'Manrope';outline:none">
+            <button onClick="{{ searchAdd }}" style="padding:10px 16px;border:1px solid var(--c12,#262b36);border-radius:10px;background:var(--c0,#0b0c10);color:var(--t1,#e4e7ec);font:800 12.5px 'Manrope';cursor:pointer">Find</button>
+          </div>
+          <div style="font:600 11px 'Manrope';color:var(--t6,#8b91a0);margin-top:6px;min-height:14px">{{ addMsg }}</div>
+          <sc-if value="{{ addFound }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:8px;padding:12px;border:1px solid var(--c9,rgba(255,255,255,.13));border-radius:12px;background:var(--c0,#0b0c10)">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                <span style="width:34px;height:34px;border-radius:99px;background:{{ addFoundColor }};display:grid;place-items:center;font:800 12px 'Manrope';color:#04140b">{{ addFoundInitials }}</span>
+                <div><div style="font:700 13px 'Manrope';color:var(--t0,#f2f3f5)">{{ addFoundName }}</div><div style="font:600 11px 'Manrope';color:var(--t6,#8b91a0)">{{ addFoundHandle }}</div></div>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+                <sc-for list="{{ labelOptions }}" as="l" hint-placeholder-count="4">
+                  <button onClick="{{ l.pick }}" style="padding:6px 12px;border:1px solid var(--c12,#262b36);border-radius:99px;background:{{ l.bg }};color:{{ l.fg }};font:700 11.5px 'Manrope';cursor:pointer">{{ l.name }}</button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ isWork }}" hint-placeholder-val="{{ false }}">
+                <input value="{{ addTeam }}" onInput="{{ onAddTeam }}" placeholder="Team (optional)" style="width:100%;box-sizing:border-box;background:var(--c2,#0c0e12);border:1px solid var(--c12,#262b36);border-radius:10px;padding:9px 11px;color:var(--t0,#f2f3f5);font:600 12px 'Manrope';outline:none;margin-bottom:8px">
+              </sc-if>
+              <button onClick="{{ doAdd }}" style="width:100%;padding:10px 0;border:none;border-radius:10px;background:{{ accent }};color:var(--c0,#0b0c10);font:800 12.5px 'Manrope';cursor:pointer">Send request</button>
+            </div>
+          </sc-if>
+          <button onClick="{{ copyInvite }}" style="margin-top:10px;width:100%;padding:9px 0;border:1px dashed var(--c14,#39415a);border-radius:10px;background:none;color:var(--t4,#aab0bd);font:700 11.5px 'Manrope';cursor:pointer">⚭ Copy invite link</button>
+          <sc-if value="{{ hasIncoming }}" hint-placeholder-val="{{ false }}">
+            <div style="font:700 10px 'JetBrains Mono';color:var(--t8,#5c6270);letter-spacing:1.2px;margin:18px 0 8px">REQUESTS</div>
+            <sc-for list="{{ incomingList }}" as="r" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;gap:10px;padding:9px 0">
+                <span style="width:32px;height:32px;border-radius:99px;background:{{ r.color }};display:grid;place-items:center;font:800 11px 'Manrope';color:#04140b;flex-shrink:0">{{ r.initials }}</span>
+                <div style="flex:1;min-width:0"><div style="font:700 12.5px 'Manrope';color:var(--t0,#f2f3f5)">{{ r.name }}</div><div style="font:600 10.5px 'Manrope';color:var(--t6,#8b91a0)">{{ r.handle }}</div></div>
+                <button onClick="{{ r.accept }}" style="padding:7px 12px;border:none;border-radius:9px;background:{{ accent }};color:var(--c0,#0b0c10);font:800 11px 'Manrope';cursor:pointer">Accept</button>
+                <button onClick="{{ r.decline }}" style="padding:7px 10px;border:1px solid var(--c12,#262b36);border-radius:9px;background:none;color:var(--t6,#8b91a0);font:700 11px 'Manrope';cursor:pointer">✕</button>
+              </div>
+            </sc-for>
+          </sc-if>
+          <div style="font:700 10px 'JetBrains Mono';color:var(--t8,#5c6270);letter-spacing:1.2px;margin:18px 0 8px">YOUR PEOPLE</div>
+          <sc-if value="{{ noConns }}" hint-placeholder-val="{{ false }}">
+            <div style="font:500 12px/1.5 'Manrope';color:var(--t6,#8b91a0);padding:6px 0">No one yet. Add someone by @handle, or share your invite link.</div>
+          </sc-if>
+          <sc-for list="{{ spaceConns }}" as="c" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--c7,#1c1f27)">
+              <span style="width:34px;height:34px;border-radius:99px;background:{{ c.color }};display:grid;place-items:center;font:800 12px 'Manrope';color:#04140b;flex-shrink:0">{{ c.initials }}</span>
+              <div style="flex:1;min-width:0">
+                <div style="font:700 12.5px 'Manrope';color:var(--t0,#f2f3f5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</div>
+                <div style="font:600 10.5px 'Manrope';color:var(--t6,#8b91a0)">{{ c.label }}{{ c.team }}</div>
+              </div>
+              <button onClick="{{ c.openDM }}" style="padding:7px 14px;border:1px solid var(--c12,#262b36);border-radius:99px;background:var(--c0,#0b0c10);color:var(--t1,#e4e7ec);font:800 11.5px 'Manrope';cursor:pointer" style-hover="border-color:#3b4353">Message</button>
+            </div>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{ handleAndDM }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ dmBack }}" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--t4,#aab0bd);font:700 12px 'Manrope';cursor:pointer;padding:0 0 10px">← Back</button>
+          <div style="font:800 15px 'Space Grotesk';color:var(--t0,#f2f3f5);margin-bottom:10px">{{ dmName }}</div>
+          <div style="display:flex;flex-direction:column;gap:7px;max-height:44vh;overflow:auto;padding:4px 0 10px">
+            <sc-for list="{{ dmMsgs }}" as="m" hint-placeholder-count="4">
+              <div style="align-self:{{ m.align }};max-width:78%;background:{{ m.bg }};color:{{ m.fg }};padding:8px 12px;border-radius:14px;font:500 13px/1.45 'Manrope';word-break:break-word">{{ m.text }}</div>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:8px;border-top:1px solid var(--c7,#1c1f27);padding-top:10px">
+            <input value="{{ dmInput }}" onInput="{{ onDmInput }}" onKeyDown="{{ dmKey }}" placeholder="Message…" style="flex:1;background:var(--c0,#0b0c10);border:1px solid var(--c12,#262b36);border-radius:12px;padding:10px 13px;color:var(--t0,#f2f3f5);font:600 13px 'Manrope';outline:none">
+            <button onClick="{{ sendDMMsg }}" style="padding:10px 16px;border:none;border-radius:12px;background:{{ accent }};color:var(--c0,#0b0c10);font:800 12.5px 'Manrope';cursor:pointer">Send</button>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+  </sc-if>
   <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
   <div onClick="{{ closeModal }}" style="position:fixed;inset:0;z-index:85;background:rgba(4,10,7,.45);backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:center;animation:fadeIn .2s">
     <div onClick="{{ stopProp }}" data-screen-label="Modal" style="width:min(400px,92vw);max-height:86vh;overflow:auto;background:var(--c4,#141821);border:1px solid var(--c9,rgba(255,255,255,.13));border-radius:26px;backdrop-filter:blur(28px) saturate(1.6);box-shadow:0 30px 90px rgba(0,0,0,.5);padding:20px;animation:viewIn .35s cubic-bezier(.22,1,.36,1)">
@@ -1980,6 +2154,9 @@ class Component extends DCLogic {
     space: this.props.defaultSpace ?? 'work',
     view: 'chat', lang: 'en', theme: 'dark', langMenuOpen: false, spacePhase: 'in', sbCollapsed: false,
     modal: null, user: { signedIn: false, name: 'Jordan', email: 'jordan@jointspace.app', color: '#159d58', status: 'online', avatarImg: null },
+    friendsOpen: false, myUserId: '', myHandle: '', handleInput: '', handleMsg: '',
+    addQuery: '', addFound: null, addMsg: '', addLabel: '', addTeam: '',
+    incoming: [], connections: [], dmWith: null, dmMsgs: [], dmInput: '',
     authMode: 'signin', loginName: '', authError: '', authBusy: false, spacePicked: false, pickerLeaving: false, introPlaying: true, warping: false, rememberMe: true,
     loginEmail: '', loginPw: '', notifOn: true, soundOn: true, skipIntro: false, gemKey: '',
     isMobile: false, toast: '',
@@ -2056,6 +2233,40 @@ class Component extends DCLogic {
   componentDidUpdate(prevProps) {
     if (prevProps.lightBlobOpacity !== this.props.lightBlobOpacity || prevProps.lightBlobVibrance !== this.props.lightBlobVibrance) this.applyTheme();
   }
+  openFriends(){ this.setState({ friendsOpen: true, dmWith: null, addFound: null, addMsg: '', addQuery: '' }); this.reloadFriends(); }
+  reloadFriends(){
+    if (!(window.jointDB && window.jointDB.ready())){ this.setState({ handleMsg: 'Sign in to add people' }); return; }
+    window.jointDB.myProfile().then(p => this.setState({ myHandle: (p && p.username) || '', handleInput: (p && p.username) || this.state.handleInput, myUserId: (p && p.id) || this.state.myUserId }));
+    window.jointDB.listIncoming().then(list => this.setState({ incoming: list || [] }));
+    window.jointDB.listConnections().then(list => this.setState({ connections: list || [] }));
+  }
+  saveHandle(){
+    const h = (this.state.handleInput || '').trim();
+    window.jointDB.setUsername(h).then(r => { if (r.ok){ this.setState({ myHandle: r.username, handleMsg: 'Saved \u2713' }); this.toast('Your handle is @' + r.username); } else this.setState({ handleMsg: r.error || 'Could not save' }); });
+  }
+  searchAdd(){
+    const q = (this.state.addQuery || '').trim();
+    if (!q){ this.setState({ addFound: null, addMsg: '' }); return; }
+    window.jointDB.searchByHandle(q).then(u => this.setState({ addFound: u, addMsg: u ? '' : 'No user with that @handle' }));
+  }
+  doAdd(){
+    const u = this.state.addFound; if (!u) return;
+    const space = this.state.space === 'work' ? 'work' : 'casual';
+    const meta = { space, label: this.state.addLabel || '', team: this.state.space === 'work' ? (this.state.addTeam || '') : '' };
+    window.jointDB.sendRequest(u.id, meta).then(r => {
+      if (!r.ok){ this.setState({ addMsg: r.error || 'Could not send' }); return; }
+      this.toast(r.accepted ? 'Connected with @' + u.username : (r.already ? 'Already ' + (r.already === 'connected' ? 'connected' : 'requested') : 'Request sent to @' + u.username));
+      this.setState({ addQuery: '', addFound: null, addLabel: '', addTeam: '', addMsg: '' });
+      this.reloadFriends();
+    });
+  }
+  respondReq(connId, accept){ window.jointDB.respondRequest(connId, accept).then(() => { this.toast(accept ? 'Connection accepted \u2713' : 'Request declined'); this.reloadFriends(); }); }
+  openDM(user){ this.setState({ dmWith: user, dmMsgs: [], dmInput: '' }); window.jointDB.listDMs(user.id).then(msgs => this.setState({ dmMsgs: msgs || [] })); }
+  sendDMMsg(){
+    const u = this.state.dmWith, body = (this.state.dmInput || '').trim(); if (!u || !body) return;
+    window.jointDB.sendDM(u.id, body).then(r => { if (r.ok && r.msg){ this.setState(st => ({ dmMsgs: [...st.dmMsgs, r.msg], dmInput: '' })); } else if (r.ok){ this.setState({ dmInput: '' }); } else this.toast(r.error || 'Message failed'); });
+  }
+  copyInvite(){ window.jointDB.inviteLink().then(link => { if (!link){ this.toast('Set your @handle first'); return; } try { navigator.clipboard.writeText(link); this.toast('Invite link copied \u2713'); } catch(e){ this.toast(link); } }); }
   componentDidMount() {
     this.applyTheme();
     try { var _gk = localStorage.getItem('joint_gem_key') || ''; if (_gk) { window.JOINT_GEM_KEY = _gk; this.setState({ gemKey: _gk }); } } catch (_e) {}
@@ -2063,6 +2274,13 @@ class Component extends DCLogic {
       const applyUser = u => { if (!u) return; this.setState(st => st.user.signedIn ? {} : ({ user: { ...st.user, signedIn: true, email: u.email || st.user.email, name: (u.user_metadata && u.user_metadata.full_name) || (u.email ? u.email.split('@')[0] : st.user.name) }, modal: null, authError: '' })); };
       window.jointAuth.currentUser().then(applyUser).catch(() => {});
       window.jointAuth.onChange(applyUser);
+    }
+    if (window.jointDB && window.jointDB.ready()) {
+      const uid = window.jointDB.myId ? window.jointDB.myId() : null; if (uid) this.setState({ myUserId: uid });
+      window.jointDB.myProfile().then(p => { if (p && p.username) this.setState({ myHandle: p.username, handleInput: p.username }); if (p && p.id) this.setState({ myUserId: p.id }); });
+      window.jointDB.handleInvite().then(res => { if (res && res.user) this.toast((res.res && res.res.accepted ? 'Connected with @' : 'Request sent to @') + res.user.username); });
+      this._dmUnsub = window.jointDB.subscribeDMs(m => { const dw = this.state.dmWith; if (dw && (m.sender === dw.id || m.recipient === dw.id)) this.setState(st => st.dmMsgs.some(x => x.id === m.id) ? {} : ({ dmMsgs: [...st.dmMsgs, m] })); });
+      this._connUnsub = window.jointDB.subscribeConnections(() => { if (this.state.friendsOpen) this.reloadFriends(); });
     }
     if (this.state.skipIntro) this.setState({ introPlaying: false });
     else this._introTimer = setTimeout(() => this.setState({ introPlaying: false }), 2300);
@@ -2394,6 +2612,29 @@ class Component extends DCLogic {
       openAccount: () => this.setState({ modal: 'account' }),
       openSettings: () => this.setState({ modal: 'settings' }),
       closeModal: () => this.setState({ modal: null }),
+      friendsOpen: s.friendsOpen, openFriends: () => this.openFriends(), closeFriends: () => this.setState({ friendsOpen: false, dmWith: null }),
+      friendsSpaceWord: s.space === 'work' ? 'Work' : 'Casual',
+      hasHandle: !!s.myHandle, myHandleAt: s.myHandle ? ('@' + s.myHandle) : '',
+      handleInput: s.handleInput, onHandleInput: e => this.setState({ handleInput: e.target.value, handleMsg: '' }), handleMsg: s.handleMsg, saveHandle: () => this.saveHandle(),
+      addQuery: s.addQuery, onAddQuery: e => this.setState({ addQuery: e.target.value, addMsg: '' }), searchAdd: () => this.searchAdd(),
+      addFound: !!s.addFound,
+      addFoundName: s.addFound ? (s.addFound.display_name || ('@' + s.addFound.username)) : '',
+      addFoundHandle: s.addFound ? ('@' + s.addFound.username) : '',
+      addFoundInitials: s.addFound ? (s.addFound.display_name || s.addFound.username || '?').slice(0, 2).toUpperCase() : '',
+      addFoundColor: s.addFound ? (s.addFound.color || '#159d58') : '#159d58',
+      addMsg: s.addMsg, isWork: s.space === 'work', addTeam: s.addTeam, onAddTeam: e => this.setState({ addTeam: e.target.value }), doAdd: () => this.doAdd(),
+      labelOptions: (s.space === 'work' ? ['Colleague', 'Teammate', 'Manager', 'Report'] : ['Friend', 'Family', 'Partner']).map(l => ({ name: l, bg: s.addLabel === l ? accent : 'var(--c0,#0b0c10)', fg: s.addLabel === l ? 'var(--c0,#0b0c10)' : 'var(--t4,#aab0bd)', pick: () => this.setState({ addLabel: l }) })),
+      hasIncoming: s.incoming.length > 0,
+      incomingList: s.incoming.map(it => ({ name: it.user.display_name || ('@' + it.user.username) || 'Someone', handle: it.user.username ? ('@' + it.user.username) : '', initials: (it.user.display_name || it.user.username || '?').slice(0, 2).toUpperCase(), color: it.user.color || '#159d58', accept: () => this.respondReq(it.connId, true), decline: () => this.respondReq(it.connId, false) })),
+      hasConns: s.connections.length > 0,
+      spaceConns: s.connections.map(c => { const meta = s.space === 'work' ? c.work : c.casual; return { name: c.user.display_name || ('@' + c.user.username), handle: c.user.username ? ('@' + c.user.username) : '', initials: (c.user.display_name || c.user.username || '?').slice(0, 2).toUpperCase(), color: c.user.color || '#159d58', label: meta && meta.label ? meta.label : '', team: meta && meta.team ? (' · ' + meta.team) : '', hasLabel: !!(meta && meta.label), openDM: () => this.openDM(c.user) }; }),
+      copyInvite: () => this.copyInvite(),
+      dmOpen: !!s.dmWith, dmName: s.dmWith ? (s.dmWith.display_name || ('@' + s.dmWith.username)) : '', dmBack: () => this.setState({ dmWith: null }),
+      dmInput: s.dmInput, onDmInput: e => this.setState({ dmInput: e.target.value }), sendDMMsg: () => this.sendDMMsg(),
+      dmKey: e => { if (e.key === 'Enter') this.sendDMMsg(); },
+      dmMsgs: s.dmMsgs.map(m => ({ text: m.body, mine: m.sender === s.myUserId, align: m.sender === s.myUserId ? 'flex-end' : 'flex-start', bg: m.sender === s.myUserId ? accent : 'var(--c5,#181c24)', fg: m.sender === s.myUserId ? 'var(--c0,#0b0c10)' : 'var(--t0,#f2f3f5)' })),
+      noHandle: !s.myHandle, handleAndList: !!s.myHandle && !s.dmWith, handleAndDM: !!s.myHandle && !!s.dmWith, noConns: !s.connections.length,
+      addKey: e => { if (e.key === 'Enter') this.searchAdd(); },
       stopProp: e => e.stopPropagation(),
       modalTitle: s.modal === 'account' ? (s.user.signedIn ? 'Account' : 'Sign in') : 'Settings',
       signedIn: s.user.signedIn, notSignedIn: !s.user.signedIn,

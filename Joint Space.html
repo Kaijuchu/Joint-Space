@@ -89,6 +89,107 @@ window.JOINT_CONFIG = {
     },
     onChange: function(cb){ __authListeners.push(cb); if (__lastUser) { try { cb(__lastUser); } catch (e) {} } }
   };
+
+  // ---- Social layer: profiles, connections, direct messages ----
+  function __myId(){ return __lastUser ? __lastUser.id : null; }
+  var __NIL = '00000000-0000-0000-0000-000000000000';
+  function __profByIds(ids){
+    if (!sb || !ids.length) return Promise.resolve([]);
+    return sb.from('profiles').select('id,username,display_name,color').in('id', ids).then(function(r){ return r.data || []; });
+  }
+  window.jointDB = {
+    ready: function(){ return !!sb; },
+    myProfile: function(){
+      var id = __myId(); if (!sb || !id) return Promise.resolve(null);
+      return sb.from('profiles').select('id,username,display_name,color').eq('id', id).maybeSingle().then(function(r){
+        return r.data || { id:id, username:null, display_name:((__lastUser.user_metadata&&__lastUser.user_metadata.full_name)||null), color:'#159d58' };
+      });
+    },
+    setUsername: function(handle){
+      var id = __myId(); if (!sb || !id) return Promise.resolve({ ok:false, error:'Not signed in' });
+      handle = (handle||'').trim().replace(/^@/,'');
+      if (!/^[a-zA-Z0-9_]{3,20}$/.test(handle)) return Promise.resolve({ ok:false, error:'3-20 chars: letters, numbers, underscore' });
+      return sb.from('profiles').update({ username: handle }).eq('id', id).then(function(r){
+        if (r.error){ var m=r.error.message||''; return { ok:false, error:/duplicate|unique/i.test(m)?'That @handle is taken':m }; }
+        return { ok:true, username: handle };
+      });
+    },
+    searchByHandle: function(handle){
+      if (!sb) return Promise.resolve(null);
+      handle = (handle||'').trim().replace(/^@/,'');
+      if (!handle) return Promise.resolve(null);
+      return sb.from('profiles').select('id,username,display_name,color').ilike('username', handle).neq('id', __myId()||__NIL).maybeSingle().then(function(r){ return r.data || null; });
+    },
+    sendRequest: function(targetId){
+      var me = __myId(); if (!sb || !me) return Promise.resolve({ ok:false, error:'Not signed in' });
+      if (targetId === me) return Promise.resolve({ ok:false, error:"That's you" });
+      return sb.from('connections').select('*').or('and(requester.eq.'+me+',addressee.eq.'+targetId+'),and(requester.eq.'+targetId+',addressee.eq.'+me+')').then(function(r){
+        var rows = r.data || [];
+        if (rows.length){
+          var ex = rows[0];
+          if (ex.status === 'accepted') return { ok:true, already:'connected' };
+          if (ex.addressee === me) return sb.from('connections').update({ status:'accepted' }).eq('id', ex.id).then(function(){ return { ok:true, accepted:true }; });
+          return { ok:true, already:'pending' };
+        }
+        return sb.from('connections').insert({ requester: me, addressee: targetId }).then(function(ins){ return ins.error ? { ok:false, error:ins.error.message } : { ok:true, sent:true }; });
+      });
+    },
+    respondRequest: function(connId, accept){
+      if (!sb) return Promise.resolve({ ok:false });
+      if (accept) return sb.from('connections').update({ status:'accepted' }).eq('id', connId).then(function(r){ return { ok:!r.error, error:r.error&&r.error.message }; });
+      return sb.from('connections').delete().eq('id', connId).then(function(r){ return { ok:!r.error }; });
+    },
+    removeConnection: function(otherId){
+      var me = __myId(); if (!sb || !me) return Promise.resolve({ ok:false });
+      return sb.from('connections').delete().or('and(requester.eq.'+me+',addressee.eq.'+otherId+'),and(requester.eq.'+otherId+',addressee.eq.'+me+')').then(function(r){ return { ok:!r.error }; });
+    },
+    listConnections: function(){
+      var me = __myId(); if (!sb || !me) return Promise.resolve([]);
+      return sb.from('connections').select('*').eq('status','accepted').or('requester.eq.'+me+',addressee.eq.'+me).then(function(r){
+        var rows = r.data || []; var others = rows.map(function(c){ return c.requester===me ? c.addressee : c.requester; });
+        return __profByIds(others);
+      });
+    },
+    listIncoming: function(){
+      var me = __myId(); if (!sb || !me) return Promise.resolve([]);
+      return sb.from('connections').select('*').eq('status','pending').eq('addressee', me).then(function(r){
+        var rows = r.data || [];
+        return __profByIds(rows.map(function(c){ return c.requester; })).then(function(profs){
+          var byId = {}; profs.forEach(function(p){ byId[p.id]=p; });
+          return rows.map(function(c){ return { connId:c.id, user: byId[c.requester] || { id:c.requester, username:'unknown' } }; });
+        });
+      });
+    },
+    inviteLink: function(){
+      var base = location.origin + location.pathname;
+      return this.myProfile().then(function(p){ return (p && p.username) ? base + '?add=' + p.username : null; });
+    },
+    handleInvite: function(){
+      var m = /[?&]add=([A-Za-z0-9_]+)/.exec(location.search); if (!m) return Promise.resolve(null);
+      var handle = m[1], self = this;
+      try { history.replaceState({}, '', location.pathname); } catch(e){}
+      return this.searchByHandle(handle).then(function(u){ if (!u) return null; return self.sendRequest(u.id).then(function(res){ return { user:u, res:res }; }); });
+    },
+    sendDM: function(recipientId, body){
+      var me = __myId(); if (!sb || !me) return Promise.resolve({ ok:false });
+      body = (body||'').trim(); if (!body) return Promise.resolve({ ok:false });
+      return sb.from('direct_messages').insert({ sender: me, recipient: recipientId, body: body }).select().maybeSingle().then(function(r){ return r.error ? { ok:false, error:r.error.message } : { ok:true, msg:r.data }; });
+    },
+    listDMs: function(otherId){
+      var me = __myId(); if (!sb || !me) return Promise.resolve([]);
+      return sb.from('direct_messages').select('*').or('and(sender.eq.'+me+',recipient.eq.'+otherId+'),and(sender.eq.'+otherId+',recipient.eq.'+me+')').order('created_at',{ ascending:true }).then(function(r){ return r.data || []; });
+    },
+    subscribeDMs: function(cb){
+      if (!sb) return function(){};
+      var ch = sb.channel('dm-'+(__myId()||'x')).on('postgres_changes', { event:'INSERT', schema:'public', table:'direct_messages' }, function(p){ cb(p.new); }).subscribe();
+      return function(){ try { sb.removeChannel(ch); } catch(e){} };
+    },
+    subscribeConnections: function(cb){
+      if (!sb) return function(){};
+      var ch = sb.channel('conn-'+(__myId()||'x')).on('postgres_changes', { event:'*', schema:'public', table:'connections' }, function(p){ cb(p); }).subscribe();
+      return function(){ try { sb.removeChannel(ch); } catch(e){} };
+    }
+  };
 })();
 </script>
 <script>

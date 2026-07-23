@@ -105,126 +105,32 @@ class Component extends DCLogic {
     isMobile: false, toast: '',
     aiOpen: false, aiBusy: false, aiInput: '',
     aiMsgs: [{ role: 'ai', text: "Hey, I'm Spacey — your copilot in every room. I can summarize threads, spin up tasks, answer wiki questions, plan timelines… and on the Fun side I host Meme Clash. Try a quick action below." }],
-    chatInput: '', activeChannel: 'design-crit', addingChannel: false, newChannelName: '', addingRoom: false, newRoomName: '',
+    chatInput: '', activeChannel: 'general', addingChannel: false, newChannelName: '', addingRoom: false, newRoomName: '',
     channels: [
-      { id: 'general', name: 'general', unread: 2, msgs: [
-        { who: 'MC', text: 'Standup digest is live — Spacey posts it every morning at 9. One less meeting 🎉'.replace(' 🎉',''), time: '9:02 AM' },
-        { who: 'DO', text: 'Reminder: game night warmup at 5 in the Fun space. Meme Clash, bring your worst.', time: '11:40 AM' },
-        { who: 'SR', text: 'Uploaded Brand kit v3 to Files — new accent ramps for both spaces are in there.', time: '1:12 PM' }
-      ]},
-      { id: 'design-crit', name: 'design-crit', unread: 0, msgs: [
-        { who: 'MC', text: 'Proposal: keep one shell for both spaces and only swap accent + content. Switching should feel like changing rooms, not changing apps.', time: '10:04 AM' },
-        { who: 'SR', text: 'Agree. I mocked the segmented WORK / FUN switcher in the sidebar. Fun accent is coral #2fbf77 — bold but not clownish.', time: '10:06 AM' },
-        { who: 'DO', text: 'Eng note: the voice dock has to persist across space switches. You should be able to hop into Memes while still in Focus cave.', time: '10:11 AM' },
-        { who: 'MC', text: 'Yes — dock is global chrome, not a view. Dev, can it ship behind the fun_dock flag this Friday?', time: '10:13 AM' },
-        { who: 'DO', text: 'Friday works if design freezes the dock spec by Wednesday. Sam, does coral pass contrast on var(--c0,#0b0c10) at 11px?', time: '10:15 AM' },
-        { who: 'SR', text: 'Checking today. If it fails AA I bump lightness a step. Decision before Thursday crit.', time: '10:18 AM' }
-      ]},
-      { id: 'launch-q3', name: 'launch-q3', unread: 5, msgs: [
-        { who: 'MC', text: 'Launch narrative draft is in Docs → “Q3 Launch Plan”. Core line: one space to work, one space to play, zero context lost.', time: '8:55 AM' },
-        { who: 'DO', text: 'Realtime cursors shipped to prod ✓. Whiteboard latency now under 40ms p95.'.replace(' ✓','.'), time: '9:30 AM' },
-        { who: 'SR', text: 'Teaser video cut is in Files. 32s, ends on the space-flip moment.', time: '2:20 PM' }
-      ]}
+      { id: 'general', name: 'general', unread: 0, msgs: [] }
     ],
     taskMode: 'kanban', taskSeq: 100,
     cols: [
-      { id: 'backlog', name: 'Backlog', dot: 'var(--t6,#8b91a0)', tasks: [
-        { id: 1, title: 'Competitive teardown: Notion, Slack, Discord', tag: 'Research', a: 'MC', due: 'Jul 24', pts: 3, tl: { s: 0, l: 2 } },
-        { id: 2, title: 'Space-switch micro-interaction (room change feel)', tag: 'Design', a: 'SR', due: 'Aug 2', pts: 5, tl: { s: 2, l: 3 } }
-      ]},
-      { id: 'progress', name: 'In progress', dot: '#159d58', tasks: [
-        { id: 3, title: 'Voice dock — persistent across spaces', tag: 'Eng', a: 'DO', due: 'Jul 21', pts: 8, tl: { s: 1, l: 4 } },
-        { id: 4, title: 'Meme Clash game loop v1', tag: 'Eng', a: 'DO', due: 'Jul 28', pts: 5, tl: { s: 3, l: 3 } },
-        { id: 5, title: 'Wiki AI answers — eval set', tag: 'AI', a: 'MC', due: 'Jul 30', pts: 3, tl: { s: 4, l: 2 } }
-      ]},
-      { id: 'review', name: 'In review', dot: '#f59e0b', tasks: [
-        { id: 6, title: 'Dark theme contrast pass (WCAG AA)', tag: 'Design', a: 'SR', due: 'Jul 18', pts: 2, tl: { s: 5, l: 1 } }
-      ]},
-      { id: 'done', name: 'Done', dot: '#6ee7b7', tasks: [
-        { id: 7, title: 'Realtime cursors on whiteboard', tag: 'Eng', a: 'DO', due: 'Jul 11', pts: 8, tl: { s: 0, l: 3 } },
-        { id: 8, title: 'Onboarding flow copy', tag: 'Content', a: 'MC', due: 'Jul 9', pts: 2, tl: { s: 1, l: 1 } }
-      ]}
+      { id: 'todo', name: 'To do', dot: 'var(--t6,#8b91a0)', tasks: [] },
+      { id: 'progress', name: 'In progress', dot: '#159d58', tasks: [] },
+      { id: 'done', name: 'Done', dot: '#6ee7b7', tasks: [] }
     ],
     docs: [
-      { id: 'launch', title: 'Q3 Launch Plan', updated: 'Edited 2h ago by Maya', blocks: [
-        { t: 'h', x: 'The pitch' },
-        { t: 'p', x: 'Joint Space is where a team lives, not just where it works. One shell, two rooms: a Work space with docs, tasks, whiteboards and wikis — and a Fun space with voice lounges, watch parties and games. Switching rooms keeps your people, your voice call, and your context.' },
-        { t: 'q', x: '“One space to work, one space to play, zero context lost.”' },
-        { t: 'h', x: 'Launch beats' },
-        { t: 'p', x: 'Week 1–2: private beta with 20 design teams. Week 3–6: voice dock + Meme Clash public. Week 7–12: automations marketplace and Spacey everywhere.' },
-        { t: 'p', x: 'Success metric: 40% of weekly-active teams touch both spaces in the same session by week 8.' }
-      ]},
-      { id: 'principles', title: 'Design Principles', updated: 'Edited yesterday by Sam', blocks: [
-        { t: 'h', x: 'Rooms, not apps' },
-        { t: 'p', x: 'Switching spaces should feel like walking down the hall, not alt-tabbing. Same shell, same people, different accent and furniture.' },
-        { t: 'h', x: 'Dark by default, loud on purpose' },
-        { t: 'p', x: 'The canvas stays near-black. Color is spent only on state, identity and play.' }
-      ]},
-      { id: 'funspec', title: 'Fun Space Spec', updated: 'Edited Mon by Dev', blocks: [
-        { t: 'h', x: 'Voice-first' },
-        { t: 'p', x: 'The lounge is the front door. Rooms are cheap to make, dock persists everywhere — including back in the Work space.' },
-        { t: 'h', x: 'Games are 5-minute sized' },
-        { t: 'p', x: 'Meme Clash rounds run under 3 minutes so they fit between meetings. Spacey plays too, and hosts.' }
-      ]}
+      { id: 'doc1', title: 'Untitled', updated: '', blocks: [] }
     ],
-    activeDoc: 'launch',
+    activeDoc: 'doc1',
     wikis: [
-      { id: 'start', cat: 'ONBOARDING', title: 'Getting started', paras: [
-        'Every team gets two spaces on day one: Work and Fun. The sidebar switcher moves you between them; your voice call and notifications follow you.',
-        'Invite people from the presence strip in the top bar. New members land in #general and the Lounge.'
-      ]},
-      { id: 'release', cat: 'ENGINEERING', title: 'Release process', paras: [
-        'Ship trains cut every Thursday at 14:00. Anything without a green end-to-end run rolls to the next train — no exceptions, no cherry-picks after cut.',
-        'Feature flags: fun_dock (voice dock in Work space), clash_v1 (Meme Clash), spacey_flows (AI-generated automations).'
-      ]},
-      { id: 'voice', cat: 'CULTURE', title: 'Voice room etiquette', paras: [
-        'Focus cave is mute-by-default — presence over conversation. Water cooler is the opposite: come to talk.',
-        'Anyone can drag a voice room on top of any view. Working with the dock open counts as hanging out.'
-      ]},
-      { id: 'brand', cat: 'BRAND', title: 'Brand voice', paras: [
-        'Confident, warm, a little playful. We say “rooms”, never “channels-but-better”. Spacey speaks in first person and never fakes certainty.'
-      ]}
+      { id: 'w1', cat: 'GENERAL', title: 'Untitled', paras: [] }
     ],
-    activeWiki: 'release', wikiQ: '', wikiA: '', wikiBusy: false,
-    stickies: [
-      { id: 1, x: 60, y: 70, c: '#ffd866', x2: 'Fun space = casual by default, work tools still reachable', },
-      { id: 2, x: 300, y: 40, c: '#ffd866', x2: 'Voice dock floats over EVERYTHING' },
-      { id: 3, x: 540, y: 90, c: '#ff9db4', x2: 'Meme Clash: jackbox-style, 3 rounds, Spacey plays' },
-      { id: 4, x: 180, y: 230, c: '#9ecbff', x2: 'Watch party: synced player + reactions that float up' },
-      { id: 5, x: 430, y: 260, c: '#9ecbff', x2: 'Memes channel doubles as game content pool' },
-      { id: 6, x: 660, y: 220, c: '#b6f2c1', x2: 'Spacey persona: host in Fun, analyst in Work' }
-    ], stickySeq: 10,
-    flows: [
-      { id: 1, name: 'Standup digest', trigger: 'Every weekday · 9:00', steps: ['Collect yesterday\'s Done tasks', 'Summarize with Spacey', 'Post to #general'], on: true, runs: 132 },
-      { id: 2, name: 'Design review reminder', trigger: 'Task moved to In review', steps: ['Notify #design-crit', 'Assign reviewer round-robin'], on: true, runs: 48 },
-      { id: 3, name: 'Meme of the week', trigger: 'Friday · 16:00', steps: ['Pick top meme by votes', 'Post to #general with crown'], on: false, runs: 9 }
-    ], flowSeq: 10, flowPrompt: '', flowBusy: false,
-    files: [
-      { n: 'Brand kit v3.fig', t: 'FIG', s: '24 MB', o: 'Sam', d: 'Jul 12', c: '#a78bfa' },
-      { n: 'Launch teaser.mp4', t: 'MP4', s: '182 MB', o: 'Maya', d: 'Jul 10', c: '#f472b6' },
-      { n: 'Q3 OKRs.xlsx', t: 'XLS', s: '86 KB', o: 'Maya', d: 'Jul 8', c: '#6ee7b7' },
-      { n: 'Voice dock spec.pdf', t: 'PDF', s: '2.1 MB', o: 'Dev', d: 'Jul 7', c: '#e2554d' },
-      { n: 'Spacey prompts.md', t: 'MD', s: '14 KB', o: 'Jordan', d: 'Jul 5', c: '#159d58' },
-      { n: 'Meme pack vol.2.zip', t: 'ZIP', s: '48 MB', o: 'Dev', d: 'Jul 2', c: '#f59e0b' }
-    ],
+    activeWiki: 'w1', wikiQ: '', wikiA: '', wikiBusy: false,
+    stickies: [], stickySeq: 10,
+    flows: [], flowSeq: 10, flowPrompt: '', flowBusy: false,
+    files: [],
     voiceRoom: null, muted: false, speakIdx: 0,
-    rooms: [
-      { id: 'focus', name: 'Focus cave', topic: 'lo-fi · deep work · mute by default', peeps: ['MC', 'DO'], c: '#6ee7b7' },
-      { id: 'cooler', name: 'Water cooler', topic: 'come say hi', peeps: ['SR'], c: '#f59e0b' },
-      { id: 'gamenight', name: 'Game night warmup', topic: 'Meme Clash at 5 — get in here', peeps: [], c: '#2fbf77' }
-    ],
+    rooms: [],
     watchPlaying: false, watchT: 23, reactions: [], reactSeq: 0, watchInput: '',
-    watchMsgs: [
-      { who: 'MC', text: 'no spoilers I was in a meeting', time: '5:01 PM' },
-      { who: 'DO', text: 'the cold open?? insane', time: '5:02 PM' },
-      { who: 'SR', text: 'pausing for snacks in 10', time: '5:04 PM' }
-    ],
-    memes: [
-      { id: 1, top: 'ME: sets status to “focusing”', bot: 'ALSO ME: opens the memes channel', bg: 'linear-gradient(135deg,#2b1055,#159d58)', author: 'Dev', votes: 47, voted: false },
-      { id: 2, top: 'THE DEPLOY ON FRIDAY', bot: 'THE ON-CALL ON SATURDAY', bg: 'linear-gradient(135deg,#3d0d1f,#2fbf77)', author: 'Maya', votes: 39, voted: false },
-      { id: 3, top: '“QUICK SYNC”', bot: '47 MINUTES LATER', bg: 'linear-gradient(135deg,#0d2b23,#6ee7b7)', author: 'Sam', votes: 31, voted: false },
-      { id: 4, top: 'SPACEY AFTER WRITING', bot: 'ITS 400TH STANDUP DIGEST', bg: 'linear-gradient(135deg,#33240b,#f59e0b)', author: 'Spacey', votes: 28, voted: false }
-    ], memeSeq: 20, memeTopic: '', memeBusy: false,
+    watchMsgs: [],
+    memes: [], memeSeq: 20, memeTopic: '', memeBusy: false,
     clash: { phase: 'lobby', round: 1, prompt: '', myCap: '', subs: [], picked: -1, results: [], scores: { You: 0, Maya: 0, Dev: 0, Spacey: 0 }, winner: '' },
     draw: { phase: 'lobby', round: 1, word: '', timer: 60, color: '#15161a', guesses: [], scores: { You: 0, Maya: 0, Dev: 0, Spacey: 0 }, solved: false, solver: '', winner: '' }
   };
@@ -409,8 +315,8 @@ class Component extends DCLogic {
   navDefs() {
     const s = this.state; const T = this.L[s.lang] || this.L.en; const N = T.nav;
     return s.space === 'work'
-      ? [['chat', N.chat, 'chat', '3'], ['tasks', N.tasks, 'tasks', ''], ['docs', N.docs, 'docs', ''], ['board', N.board, 'board', ''], ['wiki', N.wiki, 'wiki', ''], ['flows', N.flows, 'flows', '2'], ['files', N.files, 'files', '']]
-      : [['lounge', N.lounge, 'lounge', '3'], ['watch', N.watch, 'watch', 'LIVE'], ['clash', N.clash, 'clash', ''], ['draw', N.draw, 'draw', ''], ['memes', N.memes, 'memes', '12']];
+      ? [['chat', N.chat, 'chat', ''], ['tasks', N.tasks, 'tasks', ''], ['docs', N.docs, 'docs', ''], ['board', N.board, 'board', ''], ['wiki', N.wiki, 'wiki', ''], ['flows', N.flows, 'flows', ''], ['files', N.files, 'files', '']]
+      : [['lounge', N.lounge, 'lounge', ''], ['watch', N.watch, 'watch', ''], ['clash', N.clash, 'clash', ''], ['draw', N.draw, 'draw', ''], ['memes', N.memes, 'memes', '']];
   }
   startDraw() {
     this.strokes = 0;
@@ -590,8 +496,8 @@ class Component extends DCLogic {
     const T = this.L[s.lang] || this.L.en;
     const navDefs = this.navDefs();
     const _legacyDefs = s.space === 'work'
-      ? [['chat', 'Chat', 'chat', '3'], ['tasks', 'Tasks', 'tasks', ''], ['docs', 'Docs', 'docs', ''], ['board', 'Whiteboard', 'board', ''], ['wiki', 'Wiki', 'wiki', ''], ['flows', 'Automations', 'flows', '2'], ['files', 'Files', 'files', '']]
-      : [['lounge', 'Lounge', 'lounge', '3'], ['watch', 'Watch Party', 'watch', 'LIVE'], ['clash', 'Meme Clash', 'clash', ''], ['draw', 'Sketch Guess', 'draw', ''], ['memes', 'Memes', 'memes', '12']];
+      ? [['chat', 'Chat', 'chat', ''], ['tasks', 'Tasks', 'tasks', ''], ['docs', 'Docs', 'docs', ''], ['board', 'Whiteboard', 'board', ''], ['wiki', 'Wiki', 'wiki', ''], ['flows', 'Automations', 'flows', ''], ['files', 'Files', 'files', '']]
+      : [['lounge', 'Lounge', 'lounge', ''], ['watch', 'Watch Party', 'watch', ''], ['clash', 'Meme Clash', 'clash', ''], ['draw', 'Sketch Guess', 'draw', ''], ['memes', 'Memes', 'memes', '']];
     const nav = (v, label, icon, badge) => ({
       label, d: this.icons[icon], badge, go: () => this.setState({ view: v }),
       bg: s.view === v ? accent + '22' : 'transparent', fg: s.view === v ? 'var(--t0,#f2f3f5)' : 'var(--t5,#9aa1af)',
@@ -689,7 +595,7 @@ class Component extends DCLogic {
       navItems: navDefs.map(d => nav(...d)),
       mobileNav: [...navDefs.slice(0, 4).map(d => nav(...d)), { label: s.space === 'work' ? T.nav.toFun : T.nav.toWork, d: 'M12 3a9 9 0 1 0 9 9M12 3l3 3M12 3 9 6', badge: '', badgeBg: 'transparent', badgeFg: 'transparent', fg: accent, bg: 'transparent', go: () => this.switchSpace(s.space === 'work' ? 'fun' : 'work') }],
       viewTitle: titles[s.view][0], viewSub: titles[s.view][1],
-      presence: [{ i: 'MC', c: P.MC.c }, { i: 'DO', c: P.DO.c }, { i: 'SR', c: P.SR.c }, { i: (s.user.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(), c: s.user.color }],
+      presence: [{ i: (s.user.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(), c: s.user.color }],
       toggleAI: () => this.setState({ aiOpen: !s.aiOpen }), closeAI: () => this.setState({ aiOpen: false }),
       glowRef: el => { this.glowEl = el; },
       sbRef: el => { this.sbEl = el; },
@@ -1978,126 +1884,32 @@ class Component extends DCLogic {
     isMobile: false, toast: '',
     aiOpen: false, aiBusy: false, aiInput: '',
     aiMsgs: [{ role: 'ai', text: "Hey, I'm Spacey — your copilot in every room. I can summarize threads, spin up tasks, answer wiki questions, plan timelines… and on the Fun side I host Meme Clash. Try a quick action below." }],
-    chatInput: '', activeChannel: 'design-crit', addingChannel: false, newChannelName: '', addingRoom: false, newRoomName: '',
+    chatInput: '', activeChannel: 'general', addingChannel: false, newChannelName: '', addingRoom: false, newRoomName: '',
     channels: [
-      { id: 'general', name: 'general', unread: 2, msgs: [
-        { who: 'MC', text: 'Standup digest is live — Spacey posts it every morning at 9. One less meeting 🎉'.replace(' 🎉',''), time: '9:02 AM' },
-        { who: 'DO', text: 'Reminder: game night warmup at 5 in the Fun space. Meme Clash, bring your worst.', time: '11:40 AM' },
-        { who: 'SR', text: 'Uploaded Brand kit v3 to Files — new accent ramps for both spaces are in there.', time: '1:12 PM' }
-      ]},
-      { id: 'design-crit', name: 'design-crit', unread: 0, msgs: [
-        { who: 'MC', text: 'Proposal: keep one shell for both spaces and only swap accent + content. Switching should feel like changing rooms, not changing apps.', time: '10:04 AM' },
-        { who: 'SR', text: 'Agree. I mocked the segmented WORK / FUN switcher in the sidebar. Fun accent is coral #2fbf77 — bold but not clownish.', time: '10:06 AM' },
-        { who: 'DO', text: 'Eng note: the voice dock has to persist across space switches. You should be able to hop into Memes while still in Focus cave.', time: '10:11 AM' },
-        { who: 'MC', text: 'Yes — dock is global chrome, not a view. Dev, can it ship behind the fun_dock flag this Friday?', time: '10:13 AM' },
-        { who: 'DO', text: 'Friday works if design freezes the dock spec by Wednesday. Sam, does coral pass contrast on var(--c0,#0b0c10) at 11px?', time: '10:15 AM' },
-        { who: 'SR', text: 'Checking today. If it fails AA I bump lightness a step. Decision before Thursday crit.', time: '10:18 AM' }
-      ]},
-      { id: 'launch-q3', name: 'launch-q3', unread: 5, msgs: [
-        { who: 'MC', text: 'Launch narrative draft is in Docs → “Q3 Launch Plan”. Core line: one space to work, one space to play, zero context lost.', time: '8:55 AM' },
-        { who: 'DO', text: 'Realtime cursors shipped to prod ✓. Whiteboard latency now under 40ms p95.'.replace(' ✓','.'), time: '9:30 AM' },
-        { who: 'SR', text: 'Teaser video cut is in Files. 32s, ends on the space-flip moment.', time: '2:20 PM' }
-      ]}
+      { id: 'general', name: 'general', unread: 0, msgs: [] }
     ],
     taskMode: 'kanban', taskSeq: 100,
     cols: [
-      { id: 'backlog', name: 'Backlog', dot: 'var(--t6,#8b91a0)', tasks: [
-        { id: 1, title: 'Competitive teardown: Notion, Slack, Discord', tag: 'Research', a: 'MC', due: 'Jul 24', pts: 3, tl: { s: 0, l: 2 } },
-        { id: 2, title: 'Space-switch micro-interaction (room change feel)', tag: 'Design', a: 'SR', due: 'Aug 2', pts: 5, tl: { s: 2, l: 3 } }
-      ]},
-      { id: 'progress', name: 'In progress', dot: '#159d58', tasks: [
-        { id: 3, title: 'Voice dock — persistent across spaces', tag: 'Eng', a: 'DO', due: 'Jul 21', pts: 8, tl: { s: 1, l: 4 } },
-        { id: 4, title: 'Meme Clash game loop v1', tag: 'Eng', a: 'DO', due: 'Jul 28', pts: 5, tl: { s: 3, l: 3 } },
-        { id: 5, title: 'Wiki AI answers — eval set', tag: 'AI', a: 'MC', due: 'Jul 30', pts: 3, tl: { s: 4, l: 2 } }
-      ]},
-      { id: 'review', name: 'In review', dot: '#f59e0b', tasks: [
-        { id: 6, title: 'Dark theme contrast pass (WCAG AA)', tag: 'Design', a: 'SR', due: 'Jul 18', pts: 2, tl: { s: 5, l: 1 } }
-      ]},
-      { id: 'done', name: 'Done', dot: '#6ee7b7', tasks: [
-        { id: 7, title: 'Realtime cursors on whiteboard', tag: 'Eng', a: 'DO', due: 'Jul 11', pts: 8, tl: { s: 0, l: 3 } },
-        { id: 8, title: 'Onboarding flow copy', tag: 'Content', a: 'MC', due: 'Jul 9', pts: 2, tl: { s: 1, l: 1 } }
-      ]}
+      { id: 'todo', name: 'To do', dot: 'var(--t6,#8b91a0)', tasks: [] },
+      { id: 'progress', name: 'In progress', dot: '#159d58', tasks: [] },
+      { id: 'done', name: 'Done', dot: '#6ee7b7', tasks: [] }
     ],
     docs: [
-      { id: 'launch', title: 'Q3 Launch Plan', updated: 'Edited 2h ago by Maya', blocks: [
-        { t: 'h', x: 'The pitch' },
-        { t: 'p', x: 'Joint Space is where a team lives, not just where it works. One shell, two rooms: a Work space with docs, tasks, whiteboards and wikis — and a Fun space with voice lounges, watch parties and games. Switching rooms keeps your people, your voice call, and your context.' },
-        { t: 'q', x: '“One space to work, one space to play, zero context lost.”' },
-        { t: 'h', x: 'Launch beats' },
-        { t: 'p', x: 'Week 1–2: private beta with 20 design teams. Week 3–6: voice dock + Meme Clash public. Week 7–12: automations marketplace and Spacey everywhere.' },
-        { t: 'p', x: 'Success metric: 40% of weekly-active teams touch both spaces in the same session by week 8.' }
-      ]},
-      { id: 'principles', title: 'Design Principles', updated: 'Edited yesterday by Sam', blocks: [
-        { t: 'h', x: 'Rooms, not apps' },
-        { t: 'p', x: 'Switching spaces should feel like walking down the hall, not alt-tabbing. Same shell, same people, different accent and furniture.' },
-        { t: 'h', x: 'Dark by default, loud on purpose' },
-        { t: 'p', x: 'The canvas stays near-black. Color is spent only on state, identity and play.' }
-      ]},
-      { id: 'funspec', title: 'Fun Space Spec', updated: 'Edited Mon by Dev', blocks: [
-        { t: 'h', x: 'Voice-first' },
-        { t: 'p', x: 'The lounge is the front door. Rooms are cheap to make, dock persists everywhere — including back in the Work space.' },
-        { t: 'h', x: 'Games are 5-minute sized' },
-        { t: 'p', x: 'Meme Clash rounds run under 3 minutes so they fit between meetings. Spacey plays too, and hosts.' }
-      ]}
+      { id: 'doc1', title: 'Untitled', updated: '', blocks: [] }
     ],
-    activeDoc: 'launch',
+    activeDoc: 'doc1',
     wikis: [
-      { id: 'start', cat: 'ONBOARDING', title: 'Getting started', paras: [
-        'Every team gets two spaces on day one: Work and Fun. The sidebar switcher moves you between them; your voice call and notifications follow you.',
-        'Invite people from the presence strip in the top bar. New members land in #general and the Lounge.'
-      ]},
-      { id: 'release', cat: 'ENGINEERING', title: 'Release process', paras: [
-        'Ship trains cut every Thursday at 14:00. Anything without a green end-to-end run rolls to the next train — no exceptions, no cherry-picks after cut.',
-        'Feature flags: fun_dock (voice dock in Work space), clash_v1 (Meme Clash), spacey_flows (AI-generated automations).'
-      ]},
-      { id: 'voice', cat: 'CULTURE', title: 'Voice room etiquette', paras: [
-        'Focus cave is mute-by-default — presence over conversation. Water cooler is the opposite: come to talk.',
-        'Anyone can drag a voice room on top of any view. Working with the dock open counts as hanging out.'
-      ]},
-      { id: 'brand', cat: 'BRAND', title: 'Brand voice', paras: [
-        'Confident, warm, a little playful. We say “rooms”, never “channels-but-better”. Spacey speaks in first person and never fakes certainty.'
-      ]}
+      { id: 'w1', cat: 'GENERAL', title: 'Untitled', paras: [] }
     ],
-    activeWiki: 'release', wikiQ: '', wikiA: '', wikiBusy: false,
-    stickies: [
-      { id: 1, x: 60, y: 70, c: '#ffd866', x2: 'Fun space = casual by default, work tools still reachable', },
-      { id: 2, x: 300, y: 40, c: '#ffd866', x2: 'Voice dock floats over EVERYTHING' },
-      { id: 3, x: 540, y: 90, c: '#ff9db4', x2: 'Meme Clash: jackbox-style, 3 rounds, Spacey plays' },
-      { id: 4, x: 180, y: 230, c: '#9ecbff', x2: 'Watch party: synced player + reactions that float up' },
-      { id: 5, x: 430, y: 260, c: '#9ecbff', x2: 'Memes channel doubles as game content pool' },
-      { id: 6, x: 660, y: 220, c: '#b6f2c1', x2: 'Spacey persona: host in Fun, analyst in Work' }
-    ], stickySeq: 10,
-    flows: [
-      { id: 1, name: 'Standup digest', trigger: 'Every weekday · 9:00', steps: ['Collect yesterday\'s Done tasks', 'Summarize with Spacey', 'Post to #general'], on: true, runs: 132 },
-      { id: 2, name: 'Design review reminder', trigger: 'Task moved to In review', steps: ['Notify #design-crit', 'Assign reviewer round-robin'], on: true, runs: 48 },
-      { id: 3, name: 'Meme of the week', trigger: 'Friday · 16:00', steps: ['Pick top meme by votes', 'Post to #general with crown'], on: false, runs: 9 }
-    ], flowSeq: 10, flowPrompt: '', flowBusy: false,
-    files: [
-      { n: 'Brand kit v3.fig', t: 'FIG', s: '24 MB', o: 'Sam', d: 'Jul 12', c: '#a78bfa' },
-      { n: 'Launch teaser.mp4', t: 'MP4', s: '182 MB', o: 'Maya', d: 'Jul 10', c: '#f472b6' },
-      { n: 'Q3 OKRs.xlsx', t: 'XLS', s: '86 KB', o: 'Maya', d: 'Jul 8', c: '#6ee7b7' },
-      { n: 'Voice dock spec.pdf', t: 'PDF', s: '2.1 MB', o: 'Dev', d: 'Jul 7', c: '#e2554d' },
-      { n: 'Spacey prompts.md', t: 'MD', s: '14 KB', o: 'Jordan', d: 'Jul 5', c: '#159d58' },
-      { n: 'Meme pack vol.2.zip', t: 'ZIP', s: '48 MB', o: 'Dev', d: 'Jul 2', c: '#f59e0b' }
-    ],
+    activeWiki: 'w1', wikiQ: '', wikiA: '', wikiBusy: false,
+    stickies: [], stickySeq: 10,
+    flows: [], flowSeq: 10, flowPrompt: '', flowBusy: false,
+    files: [],
     voiceRoom: null, muted: false, speakIdx: 0,
-    rooms: [
-      { id: 'focus', name: 'Focus cave', topic: 'lo-fi · deep work · mute by default', peeps: ['MC', 'DO'], c: '#6ee7b7' },
-      { id: 'cooler', name: 'Water cooler', topic: 'come say hi', peeps: ['SR'], c: '#f59e0b' },
-      { id: 'gamenight', name: 'Game night warmup', topic: 'Meme Clash at 5 — get in here', peeps: [], c: '#2fbf77' }
-    ],
+    rooms: [],
     watchPlaying: false, watchT: 23, reactions: [], reactSeq: 0, watchInput: '',
-    watchMsgs: [
-      { who: 'MC', text: 'no spoilers I was in a meeting', time: '5:01 PM' },
-      { who: 'DO', text: 'the cold open?? insane', time: '5:02 PM' },
-      { who: 'SR', text: 'pausing for snacks in 10', time: '5:04 PM' }
-    ],
-    memes: [
-      { id: 1, top: 'ME: sets status to “focusing”', bot: 'ALSO ME: opens the memes channel', bg: 'linear-gradient(135deg,#2b1055,#159d58)', author: 'Dev', votes: 47, voted: false },
-      { id: 2, top: 'THE DEPLOY ON FRIDAY', bot: 'THE ON-CALL ON SATURDAY', bg: 'linear-gradient(135deg,#3d0d1f,#2fbf77)', author: 'Maya', votes: 39, voted: false },
-      { id: 3, top: '“QUICK SYNC”', bot: '47 MINUTES LATER', bg: 'linear-gradient(135deg,#0d2b23,#6ee7b7)', author: 'Sam', votes: 31, voted: false },
-      { id: 4, top: 'SPACEY AFTER WRITING', bot: 'ITS 400TH STANDUP DIGEST', bg: 'linear-gradient(135deg,#33240b,#f59e0b)', author: 'Spacey', votes: 28, voted: false }
-    ], memeSeq: 20, memeTopic: '', memeBusy: false,
+    watchMsgs: [],
+    memes: [], memeSeq: 20, memeTopic: '', memeBusy: false,
     clash: { phase: 'lobby', round: 1, prompt: '', myCap: '', subs: [], picked: -1, results: [], scores: { You: 0, Maya: 0, Dev: 0, Spacey: 0 }, winner: '' },
     draw: { phase: 'lobby', round: 1, word: '', timer: 60, color: '#15161a', guesses: [], scores: { You: 0, Maya: 0, Dev: 0, Spacey: 0 }, solved: false, solver: '', winner: '' }
   };
@@ -2282,8 +2094,8 @@ class Component extends DCLogic {
   navDefs() {
     const s = this.state; const T = this.L[s.lang] || this.L.en; const N = T.nav;
     return s.space === 'work'
-      ? [['chat', N.chat, 'chat', '3'], ['tasks', N.tasks, 'tasks', ''], ['docs', N.docs, 'docs', ''], ['board', N.board, 'board', ''], ['wiki', N.wiki, 'wiki', ''], ['flows', N.flows, 'flows', '2'], ['files', N.files, 'files', '']]
-      : [['lounge', N.lounge, 'lounge', '3'], ['watch', N.watch, 'watch', 'LIVE'], ['clash', N.clash, 'clash', ''], ['draw', N.draw, 'draw', ''], ['memes', N.memes, 'memes', '12']];
+      ? [['chat', N.chat, 'chat', ''], ['tasks', N.tasks, 'tasks', ''], ['docs', N.docs, 'docs', ''], ['board', N.board, 'board', ''], ['wiki', N.wiki, 'wiki', ''], ['flows', N.flows, 'flows', ''], ['files', N.files, 'files', '']]
+      : [['lounge', N.lounge, 'lounge', ''], ['watch', N.watch, 'watch', ''], ['clash', N.clash, 'clash', ''], ['draw', N.draw, 'draw', ''], ['memes', N.memes, 'memes', '']];
   }
   startDraw() {
     this.strokes = 0;
@@ -2463,8 +2275,8 @@ class Component extends DCLogic {
     const T = this.L[s.lang] || this.L.en;
     const navDefs = this.navDefs();
     const _legacyDefs = s.space === 'work'
-      ? [['chat', 'Chat', 'chat', '3'], ['tasks', 'Tasks', 'tasks', ''], ['docs', 'Docs', 'docs', ''], ['board', 'Whiteboard', 'board', ''], ['wiki', 'Wiki', 'wiki', ''], ['flows', 'Automations', 'flows', '2'], ['files', 'Files', 'files', '']]
-      : [['lounge', 'Lounge', 'lounge', '3'], ['watch', 'Watch Party', 'watch', 'LIVE'], ['clash', 'Meme Clash', 'clash', ''], ['draw', 'Sketch Guess', 'draw', ''], ['memes', 'Memes', 'memes', '12']];
+      ? [['chat', 'Chat', 'chat', ''], ['tasks', 'Tasks', 'tasks', ''], ['docs', 'Docs', 'docs', ''], ['board', 'Whiteboard', 'board', ''], ['wiki', 'Wiki', 'wiki', ''], ['flows', 'Automations', 'flows', ''], ['files', 'Files', 'files', '']]
+      : [['lounge', 'Lounge', 'lounge', ''], ['watch', 'Watch Party', 'watch', ''], ['clash', 'Meme Clash', 'clash', ''], ['draw', 'Sketch Guess', 'draw', ''], ['memes', 'Memes', 'memes', '']];
     const nav = (v, label, icon, badge) => ({
       label, d: this.icons[icon], badge, go: () => this.setState({ view: v }),
       bg: s.view === v ? accent + '22' : 'transparent', fg: s.view === v ? 'var(--t0,#f2f3f5)' : 'var(--t5,#9aa1af)',
@@ -2562,7 +2374,7 @@ class Component extends DCLogic {
       navItems: navDefs.map(d => nav(...d)),
       mobileNav: [...navDefs.slice(0, 4).map(d => nav(...d)), { label: s.space === 'work' ? T.nav.toFun : T.nav.toWork, d: 'M12 3a9 9 0 1 0 9 9M12 3l3 3M12 3 9 6', badge: '', badgeBg: 'transparent', badgeFg: 'transparent', fg: accent, bg: 'transparent', go: () => this.switchSpace(s.space === 'work' ? 'fun' : 'work') }],
       viewTitle: titles[s.view][0], viewSub: titles[s.view][1],
-      presence: [{ i: 'MC', c: P.MC.c }, { i: 'DO', c: P.DO.c }, { i: 'SR', c: P.SR.c }, { i: (s.user.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(), c: s.user.color }],
+      presence: [{ i: (s.user.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(), c: s.user.color }],
       toggleAI: () => this.setState({ aiOpen: !s.aiOpen }), closeAI: () => this.setState({ aiOpen: false }),
       glowRef: el => { this.glowEl = el; },
       sbRef: el => { this.sbEl = el; },
